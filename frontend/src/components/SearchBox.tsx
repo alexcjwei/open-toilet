@@ -19,34 +19,36 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   const [error, setError] = useState<string | null>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    searchService.debounce(async (searchQuery: string) => {
-      if (!searchQuery.trim()) {
-        setResults([]);
-        onSearchResults([]);
-        setIsLoading(false);
-        return;
-      }
+  // Search function
+  const performSearch = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
+      setResults([]);
+      onSearchResults([]);
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        setError(null);
-        const searchResults = await searchService.searchLocations(searchQuery);
-        setResults(searchResults);
-        onSearchResults(searchResults);
-        setIsOpen(true);
-      } catch (err) {
-        setError('Search failed. Please try again.');
-        setResults([]);
-        onSearchResults([]);
-        console.error('Search error:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 300),
-    [onSearchResults]
-  );
+    try {
+      setIsLoading(true);
+      setError(null);
+      const searchResults = await searchService.searchLocations(searchQuery);
+      setResults(searchResults);
+      onSearchResults(searchResults);
+      setIsOpen(true);
+    } catch (err) {
+      setError('Search failed. Please try again.');
+      setResults([]);
+      onSearchResults([]);
+      console.error('Search error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onSearchResults]);
+
+  // Debounced search function
+  const debouncedSearch = useCallback((query: string) => {
+    searchService.debounce(performSearch, 300)(query);
+    }, [performSearch]);
 
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
