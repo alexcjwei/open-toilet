@@ -50,8 +50,18 @@ const MapController: React.FC<{
   searchLocation: [number, number] | null;
   shouldFlyToSearch: boolean;
   onSearchFlyComplete: () => void;
-}> = ({ userLocation, shouldFlyTo, onFlyComplete, searchLocation, shouldFlyToSearch, onSearchFlyComplete }) => {
+  shouldSetInitialView: boolean;
+  onInitialViewSet: () => void;
+}> = ({ userLocation, shouldFlyTo, onFlyComplete, searchLocation, shouldFlyToSearch, onSearchFlyComplete, shouldSetInitialView, onInitialViewSet }) => {
   const map = useMap();
+
+  useEffect(() => {
+    if (userLocation && shouldSetInitialView) {
+      // Set initial view without animation
+      map.setView(userLocation, 16);
+      onInitialViewSet();
+    }
+  }, [userLocation, shouldSetInitialView, map, onInitialViewSet]);
 
   useEffect(() => {
     if (userLocation && shouldFlyTo) {
@@ -78,6 +88,8 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
   const [shouldFlyTo, setShouldFlyTo] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [shouldSetInitialView, setShouldSetInitialView] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchLocation[]>([]);
   const [selectedSearchLocation, setSelectedSearchLocation] = useState<SearchLocation | null>(null);
   const [shouldFlyToSearch, setShouldFlyToSearch] = useState(false);
@@ -86,6 +98,36 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
   const [showAccessCodeForm, setShowAccessCodeForm] = useState(false);
   const [selectedRestroom, setSelectedRestroom] = useState<Restroom | null>(null);
   const [isSubmittingAccessCode, setIsSubmittingAccessCode] = useState(false);
+
+  // Get user location on component mount
+  useEffect(() => {
+    if (!hasInitialized && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const newLocation: [number, number] = [latitude, longitude];
+          setUserLocation(newLocation);
+          setMapCenter(newLocation);
+          setShouldSetInitialView(true); // Set initial view without animation
+          onLocationFound?.(latitude, longitude);
+          setHasInitialized(true);
+        },
+        (error) => {
+          console.log('Could not get user location on startup:', error.message);
+          // Silently fall back to default location (NYC)
+          setHasInitialized(true);
+        },
+        {
+          enableHighAccuracy: false, // Use less accurate but faster location for initial load
+          timeout: 5000, // 5 second timeout
+          maximumAge: 300000 // 5 minutes
+        }
+      );
+    } else if (!hasInitialized) {
+      // No geolocation support, use default
+      setHasInitialized(true);
+    }
+  }, [hasInitialized, onLocationFound]);
 
   const findUserLocation = () => {
     if (navigator.geolocation) {
@@ -291,6 +333,8 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
           searchLocation={selectedSearchLocation ? [selectedSearchLocation.latitude, selectedSearchLocation.longitude] : null}
           shouldFlyToSearch={shouldFlyToSearch}
           onSearchFlyComplete={() => setShouldFlyToSearch(false)}
+          shouldSetInitialView={shouldSetInitialView}
+          onInitialViewSet={() => setShouldSetInitialView(false)}
         />
         
         {/* User location marker */}
