@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import SearchBox from './SearchBox';
 import RestroomForm from './RestroomForm';
 import AccessCodeForm from './AccessCodeForm';
+import EditRestroomForm from './EditRestroomForm';
 import { SearchLocation } from '../services/searchService';
 import { apiService } from '../services/api';
 
@@ -38,6 +39,7 @@ interface MapProps {
   restrooms: Restroom[];
   onLocationFound?: (lat: number, lng: number) => void;
   onRestroomAdded?: (restroom: Restroom) => void;
+  onRestroomUpdated?: (restroom: Restroom) => void;
   onAccessCodeAdded?: (restroomId: number, accessCode: AccessCode) => void;
   onAccessCodeVoted?: (restroomId: number, codeId: number, voteType: 'like' | 'dislike') => void;
 }
@@ -84,7 +86,7 @@ const MapController: React.FC<{
   return null;
 };
 
-const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, onAccessCodeAdded, onAccessCodeVoted }) => {
+const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, onRestroomUpdated, onAccessCodeAdded, onAccessCodeVoted }) => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
   const [shouldFlyTo, setShouldFlyTo] = useState(false);
@@ -98,6 +100,9 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
   const [showAccessCodeForm, setShowAccessCodeForm] = useState(false);
   const [selectedRestroom, setSelectedRestroom] = useState<Restroom | null>(null);
   const [isSubmittingAccessCode, setIsSubmittingAccessCode] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingRestroom, setEditingRestroom] = useState<Restroom | null>(null);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Get user location on component mount
   useEffect(() => {
@@ -311,6 +316,37 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
       console.error('Failed to vote:', error);
       alert('Failed to vote. Please try again.');
     }
+  };
+
+  // Handle opening edit form
+  const handleEditRestroomClick = (restroom: Restroom) => {
+    setEditingRestroom(restroom);
+    setShowEditForm(true);
+  };
+
+  // Handle edit form submission
+  const handleEditSubmit = async (restroomId: number, data: { name: string }) => {
+    try {
+      setIsSubmittingEdit(true);
+      const updatedRestroom = await apiService.updateRestroom(restroomId, data);
+      onRestroomUpdated?.(updatedRestroom);
+      setShowEditForm(false);
+      setEditingRestroom(null);
+      
+      // Force popup refresh by closing and reopening if needed
+      // The restrooms prop will be updated by the parent component
+    } catch (error) {
+      console.error('Failed to update restroom:', error);
+      alert('Failed to update restroom. Please try again.');
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  // Handle edit form cancellation
+  const handleEditCancel = () => {
+    setShowEditForm(false);
+    setEditingRestroom(null);
   };
 
   return (
@@ -527,22 +563,38 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
                   </p>
                 )}
                 
-                <button
-                  onClick={() => handleAddAccessCodeClick(restroom)}
-                  style={{
-                    marginTop: '12px',
-                    padding: '8px 16px',
-                    backgroundColor: '#4285f4',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    width: '100%'
-                  }}
-                >
-                  Add Access Code
-                </button>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button
+                    onClick={() => handleEditRestroomClick(restroom)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 16px',
+                      backgroundColor: '#ff9800',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Edit Name
+                  </button>
+                  <button
+                    onClick={() => handleAddAccessCodeClick(restroom)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 16px',
+                      backgroundColor: '#4285f4',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Add Code
+                  </button>
+                </div>
               </div>
             </Popup>
           </Marker>
@@ -604,6 +656,16 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
           onSubmit={handleAccessCodeSubmit}
           onCancel={handleAccessCodeCancel}
           isSubmitting={isSubmittingAccessCode}
+        />
+      )}
+
+      {/* Edit Restroom Form Modal */}
+      {showEditForm && editingRestroom && (
+        <EditRestroomForm
+          restroom={editingRestroom}
+          onSubmit={handleEditSubmit}
+          onCancel={handleEditCancel}
+          isSubmitting={isSubmittingEdit}
         />
       )}
     </div>

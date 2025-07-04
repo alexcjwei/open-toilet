@@ -73,6 +73,22 @@ class ApiService {
     return response.json();
   }
 
+  async updateRestroom(restroomId: number, data: { name: string }): Promise<Restroom> {
+    const response = await fetch(`${API_BASE_URL}/restrooms/${restroomId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update restroom');
+    }
+    return response.json();
+  }
+
   async voteOnCode(codeId: number, data: VoteData): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/restrooms/codes/${codeId}/vote`, {
       method: 'POST',

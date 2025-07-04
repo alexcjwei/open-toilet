@@ -325,4 +325,5 @@ describe('SearchBox Component', () => {
 
     expect(input.value).toBe('Starbucks, 123 Main St, New York, NY');
   });
+
 });

@@ -104,6 +104,74 @@ router.post('/:id/codes', (req, res) => {
   });
 });
 
+// Update restroom name
+router.put('/:id', (req, res) => {
+  const { name } = req.body;
+  const restroomId = req.params.id;
+  
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: 'Name is required' });
+    return;
+  }
+
+  const updateQuery = `UPDATE restrooms SET name = ? WHERE id = ?`;
+  
+  db.run(updateQuery, [name.trim(), restroomId], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (this.changes === 0) {
+      res.status(404).json({ error: 'Restroom not found' });
+      return;
+    }
+    
+    // Return the full updated restroom with access codes
+    const selectQuery = `
+      SELECT 
+        r.id,
+        r.name,
+        r.latitude,
+        r.longitude,
+        r.type,
+        r.created_at,
+        JSON_GROUP_ARRAY(
+          JSON_OBJECT(
+            'id', ac.id,
+            'code', ac.code,
+            'likes', ac.likes,
+            'dislikes', ac.dislikes,
+            'created_at', ac.created_at
+          )
+        ) as access_codes
+      FROM restrooms r
+      LEFT JOIN access_codes ac ON r.id = ac.restroom_id
+      WHERE r.id = ?
+      GROUP BY r.id
+    `;
+    
+    db.get(selectQuery, [restroomId], (err, row: any) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      if (!row) {
+        res.status(404).json({ error: 'Restroom not found' });
+        return;
+      }
+      
+      const restroom = {
+        ...row,
+        access_codes: JSON.parse(row.access_codes).filter((code: any) => code.id !== null)
+      };
+      
+      res.json(restroom);
+    });
+  });
+});
+
 // Like/dislike a code
 router.post('/codes/:id/vote', (req, res) => {
   const { type } = req.body; // 'like' or 'dislike'

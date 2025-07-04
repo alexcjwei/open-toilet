@@ -96,6 +96,21 @@ Object.defineProperty(global.navigator, 'geolocation', {
   writable: true,
 });
 
+// Mock API service
+jest.mock('../../services/api', () => ({
+  apiService: {
+    createRestroom: jest.fn().mockResolvedValue({
+      id: 3,
+      name: 'New Restroom',
+      latitude: 40.7128,
+      longitude: -74.0060,
+      type: 'neutral',
+      access_codes: [],
+      created_at: '2023-01-01T00:00:00Z'
+    })
+  }
+}));
+
 import Map from '../Map';
 
 describe('Map Component', () => {
@@ -408,5 +423,6 @@ describe('Map Component', () => {
         duration: 2
       });
     });
+
   });
 });

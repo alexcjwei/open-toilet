@@ -34,6 +34,16 @@ function App() {
     setRestrooms(prev => [...prev, newRestroom]);
   };
 
+  const handleRestroomUpdated = (updatedRestroom: Restroom) => {
+    setRestrooms(prev => 
+      prev.map(restroom => 
+        restroom.id === updatedRestroom.id 
+          ? { ...restroom, ...updatedRestroom }
+          : restroom
+      )
+    );
+  };
+
   const handleAccessCodeAdded = (restroomId: number, newAccessCode: any) => {
     setRestrooms(prev => 
       prev.map(restroom => 
@@ -103,6 +113,7 @@ function App() {
         restrooms={restrooms}
         onLocationFound={handleLocationFound}
         onRestroomAdded={handleRestroomAdded}
+        onRestroomUpdated={handleRestroomUpdated}
         onAccessCodeAdded={handleAccessCodeAdded}
         onAccessCodeVoted={handleAccessCodeVoted}
       />

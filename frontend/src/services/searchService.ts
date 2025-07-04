@@ -36,14 +36,23 @@ class SearchService {
         dedupe: '1'
       });
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${this.baseUrl}?${params}`, {
         headers: {
           'User-Agent': 'OpenToilet/1.0 (https://open-toilet.vercel.app)' // Required by Nominatim
-        }
+        },
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`Search failed: ${response.status}`);
+        if (response.status === 429) {
+          throw new Error('Search rate limit exceeded. Please try again in a moment.');
+        }
+        throw new Error(`Search failed: ${response.status} ${response.statusText}`);
       }
 
       const results: SearchResult[] = await response.json();
@@ -62,7 +71,20 @@ class SearchService {
       }));
     } catch (error) {
       console.error('Search error:', error);
-      throw new Error('Failed to search locations');
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Search request timed out. Please check your connection and try again.');
+        }
+        if (error.message.includes('rate limit')) {
+          throw error; // Re-throw rate limit error as-is
+        }
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to search service. Please check your internet connection.');
+        }
+      }
+      
+      throw new Error('Search temporarily unavailable. Please try again later.');
     }
   }
 
