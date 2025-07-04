@@ -6,7 +6,35 @@ import restroomRoutes from './routes/restrooms';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Configure CORS to only allow requests from your frontend
+const allowedOrigins = [
+  'http://localhost:3000', // Local development
+  'https://open-toilet-alexcjwei-alexcjweis-projects.vercel.app', // Your Vercel domain
+  /https:\/\/open-toilet-.*-alexcjweis-projects\.vercel\.app$/, // All Vercel preview URLs
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list or matches regex pattern
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      }
+      return allowed.test(origin);
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('Blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true // Allow cookies if needed later
+}));
 app.use(express.json());
 
 // Initialize database
