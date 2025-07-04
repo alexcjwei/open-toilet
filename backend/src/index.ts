@@ -9,8 +9,9 @@ const PORT = process.env.PORT || 3001;
 // Configure CORS to only allow requests from your frontend
 const allowedOrigins = [
   'http://localhost:3000', // Local development
+  'https://open-toilet.vercel.app', // Production domain
   'https://open-toilet-alexcjwei-alexcjweis-projects.vercel.app', // Your Vercel domain
-  /https:\/\/open-toilet-.*-alexcjweis-projects\.vercel\.app$/, // All Vercel preview URLs
+  /^https:\/\/open-toilet-.*\.vercel\.app$/, // All Vercel URLs (previews and custom domains)
 ];
 
 app.use(cors({
