@@ -43,3 +43,17 @@ App runs on http://localhost:3000
 ## API Endpoints
 
 - `GET /api/health` - Health check
+
+## Deployment
+
+This project is configured for deployment on Vercel:
+
+1. Connect your GitHub repository to Vercel
+2. Vercel will automatically build and deploy both frontend and backend
+3. The frontend will be served as a static site
+4. The backend API will be served as serverless functions
+
+### Environment Variables
+
+Set these in your Vercel dashboard:
+- Add any required environment variables for production
