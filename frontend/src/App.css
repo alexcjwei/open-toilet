@@ -1,0 +1,55 @@
+.App {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Leaflet popup customization for mobile */
+.leaflet-popup-content {
+  margin: 8px 12px;
+  line-height: 1.4;
+}
+
+.leaflet-popup-content h3 {
+  margin-top: 0;
+}
+
+/* Custom marker styles */
+.custom-marker {
+  border-radius: 50%;
+}
+
+.user-marker {
+  border-radius: 50%;
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  .leaflet-popup-content {
+    font-size: 14px;
+    min-width: 180px;
+  }
+  
+  .leaflet-popup-content h3 {
+    font-size: 16px;
+  }
+  
+  .leaflet-popup-content h4 {
+    font-size: 14px;
+  }
+}
+
+/* Ensure full height on mobile */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Fix for mobile viewport height */
+.App {
+  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
+}
