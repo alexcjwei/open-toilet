@@ -3,16 +3,19 @@ import { db } from '../database';
 
 const router = express.Router();
 
-// Get all restrooms with their codes
+// Get all restrooms with their codes and location info
 router.get('/', (req, res) => {
   const query = `
     SELECT 
       r.id,
       r.name,
-      r.latitude,
-      r.longitude,
       r.type,
       r.created_at,
+      l.id as location_id,
+      l.name as location_name,
+      l.latitude,
+      l.longitude,
+      l.address,
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
           'id', ac.id,
@@ -23,9 +26,10 @@ router.get('/', (req, res) => {
         )
       ) as access_codes
     FROM restrooms r
+    JOIN locations l ON r.location_id = l.id
     LEFT JOIN access_codes ac ON r.id = ac.restroom_id
     GROUP BY r.id
-    ORDER BY r.created_at DESC
+    ORDER BY l.created_at DESC, r.created_at DESC
   `;
 
   db.all(query, [], (err, rows) => {
@@ -35,7 +39,19 @@ router.get('/', (req, res) => {
     }
     
     const restrooms = rows.map((row: any) => ({
-      ...row,
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      created_at: row.created_at,
+      latitude: row.latitude, // Keep for backward compatibility
+      longitude: row.longitude, // Keep for backward compatibility
+      location: {
+        id: row.location_id,
+        name: row.location_name,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        address: row.address
+      },
       access_codes: JSON.parse(row.access_codes).filter((code: any) => code.id !== null)
     }));
     
@@ -45,31 +61,113 @@ router.get('/', (req, res) => {
 
 // Add a new restroom
 router.post('/', (req, res) => {
-  const { name, latitude, longitude, type } = req.body;
+  const { name, latitude, longitude, type, locationName } = req.body;
   
   if (!name || !latitude || !longitude || !type) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
 
-  const query = `INSERT INTO restrooms (name, latitude, longitude, type) VALUES (?, ?, ?, ?)`;
+  // First, check if a location already exists at these coordinates (within ~10 meters)
+  const findLocationQuery = `
+    SELECT id FROM locations 
+    WHERE ABS(latitude - ?) < 0.0001 AND ABS(longitude - ?) < 0.0001
+    LIMIT 1
+  `;
   
-  db.run(query, [name, latitude, longitude, type], function(err) {
+  db.get(findLocationQuery, [latitude, longitude], (err, existingLocation: any) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    res.json({ 
-      id: this.lastID,
-      name,
-      latitude,
-      longitude,
-      type,
-      message: 'Restroom added successfully' 
-    });
+    if (existingLocation) {
+      // Location exists, just add restroom to it
+      const restroomQuery = `INSERT INTO restrooms (location_id, name, type) VALUES (?, ?, ?)`;
+      
+      db.run(restroomQuery, [existingLocation.id, name, type], function(err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        // Return the full restroom with location info
+        returnCreatedRestroom(res, this.lastID);
+      });
+    } else {
+      // Create new location first
+      const locationQuery = `INSERT INTO locations (name, latitude, longitude) VALUES (?, ?, ?)`;
+      const finalLocationName = locationName || name; // Use locationName if provided, otherwise use restroom name
+      
+      db.run(locationQuery, [finalLocationName, latitude, longitude], function(err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        const locationId = this.lastID;
+        
+        // Now add restroom
+        const restroomQuery = `INSERT INTO restrooms (location_id, name, type) VALUES (?, ?, ?)`;
+        
+        db.run(restroomQuery, [locationId, name, type], function(err) {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          
+          // Return the full restroom with location info
+          returnCreatedRestroom(res, this.lastID);
+        });
+      });
+    }
   });
 });
+
+// Helper function to return the full restroom object after creation
+function returnCreatedRestroom(res: any, restroomId: number) {
+  const query = `
+    SELECT 
+      r.id,
+      r.name,
+      r.type,
+      r.created_at,
+      l.id as location_id,
+      l.name as location_name,
+      l.latitude,
+      l.longitude,
+      l.address
+    FROM restrooms r
+    JOIN locations l ON r.location_id = l.id
+    WHERE r.id = ?
+  `;
+  
+  db.get(query, [restroomId], (err, row: any) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    const restroom = {
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      created_at: row.created_at,
+      latitude: row.latitude, // For backward compatibility
+      longitude: row.longitude, // For backward compatibility
+      location: {
+        id: row.location_id,
+        name: row.location_name,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        address: row.address
+      },
+      access_codes: [] // New restroom has no codes yet
+    };
+    
+    res.json(restroom);
+  });
+}
 
 // Add access code to restroom
 router.post('/:id/codes', (req, res) => {
@@ -127,15 +225,18 @@ router.put('/:id', (req, res) => {
       return;
     }
     
-    // Return the full updated restroom with access codes
+    // Return the full updated restroom with access codes and location
     const selectQuery = `
       SELECT 
         r.id,
         r.name,
-        r.latitude,
-        r.longitude,
         r.type,
         r.created_at,
+        l.id as location_id,
+        l.name as location_name,
+        l.latitude,
+        l.longitude,
+        l.address,
         JSON_GROUP_ARRAY(
           JSON_OBJECT(
             'id', ac.id,
@@ -146,6 +247,7 @@ router.put('/:id', (req, res) => {
           )
         ) as access_codes
       FROM restrooms r
+      JOIN locations l ON r.location_id = l.id
       LEFT JOIN access_codes ac ON r.id = ac.restroom_id
       WHERE r.id = ?
       GROUP BY r.id
@@ -163,7 +265,19 @@ router.put('/:id', (req, res) => {
       }
       
       const restroom = {
-        ...row,
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        created_at: row.created_at,
+        latitude: row.latitude, // For backward compatibility
+        longitude: row.longitude, // For backward compatibility
+        location: {
+          id: row.location_id,
+          name: row.location_name,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          address: row.address
+        },
         access_codes: JSON.parse(row.access_codes).filter((code: any) => code.id !== null)
       };
       

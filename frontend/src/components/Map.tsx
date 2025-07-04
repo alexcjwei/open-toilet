@@ -25,6 +25,13 @@ interface Restroom {
   type: 'male' | 'female' | 'neutral';
   access_codes: AccessCode[];
   created_at: string;
+  location?: {
+    id: number;
+    name: string;
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
 }
 
 interface AccessCode {
@@ -86,7 +93,38 @@ const MapController: React.FC<{
   return null;
 };
 
-const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, onRestroomUpdated, onAccessCodeAdded, onAccessCodeVoted }) => {
+// Group restrooms by location
+const groupRestroomsByLocation = (restrooms: Restroom[]) => {
+  const locationMap = new Map<string, {
+    location: {
+      id?: number;
+      name: string;
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+    restrooms: Restroom[];
+  }>();
+  
+  restrooms.forEach(restroom => {
+    const locationKey = `${restroom.latitude},${restroom.longitude}`;
+    if (!locationMap.has(locationKey)) {
+      locationMap.set(locationKey, {
+        location: restroom.location || {
+          name: restroom.name,
+          latitude: restroom.latitude,
+          longitude: restroom.longitude
+        },
+        restrooms: []
+      });
+    }
+    locationMap.get(locationKey)!.restrooms.push(restroom);
+  });
+  
+  return Array.from(locationMap.values());
+};
+
+const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, onRestroomUpdated, onAccessCodeAdded, onAccessCodeVoted }) => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
   const [shouldFlyTo, setShouldFlyTo] = useState(false);
@@ -103,6 +141,7 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingRestroom, setEditingRestroom] = useState<Restroom | null>(null);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [selectedLocationGroup, setSelectedLocationGroup] = useState<any>(null);
 
   // Get user location on component mount
   useEffect(() => {
@@ -164,23 +203,34 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
     const iconColors = {
       male: '#4285f4',
       female: '#ea4335',
-      neutral: '#34a853'
+      neutral: '#34a853',
+      multi: '#9c27b0' // Purple for multiple restrooms
     };
+
+    const isMulti = type === 'multi';
 
     return L.divIcon({
       className: 'custom-marker',
       html: `
         <div style="
           background-color: ${iconColors[type as keyof typeof iconColors] || iconColors.neutral};
-          width: 20px;
-          height: 20px;
+          width: ${isMulti ? '24px' : '20px'};
+          height: ${isMulti ? '24px' : '20px'};
           border-radius: 50%;
           border: 2px solid white;
           box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        "></div>
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: bold;
+          color: white;
+        ">
+          ${isMulti ? '🏢' : ''}
+        </div>
       `,
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
+      iconSize: [isMulti ? 24 : 20, isMulti ? 24 : 20],
+      iconAnchor: [isMulti ? 12 : 10, isMulti ? 12 : 10]
     });
   };
 
@@ -250,6 +300,12 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
     setShowRestroomForm(true);
   };
 
+  // Handle adding another restroom to existing location
+  const handleAddAnotherRestroomClick = (locationGroup: any) => {
+    setSelectedLocationGroup(locationGroup);
+    setShowRestroomForm(true);
+  };
+
   // Handle restroom form submission
   const handleRestroomSubmit = async (restroomData: {
     name: string;
@@ -274,6 +330,7 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
   // Handle form cancellation
   const handleRestroomCancel = () => {
     setShowRestroomForm(false);
+    setSelectedLocationGroup(null); // Clear selected location group
   };
 
   // Handle opening access code form
@@ -456,145 +513,157 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
           </Marker>
         )}
 
-        {/* Restroom markers */}
-        {restrooms.map((restroom) => (
+        {/* Restroom markers grouped by location */}
+        {groupRestroomsByLocation(restrooms).map((locationGroup, index) => (
           <Marker
-            key={restroom.id}
-            position={[restroom.latitude, restroom.longitude]}
-            icon={createCustomIcon(restroom.type)}
+            key={`location-${index}`}
+            position={[locationGroup.location.latitude, locationGroup.location.longitude]}
+            icon={createCustomIcon(locationGroup.restrooms.length > 1 ? 'multi' : locationGroup.restrooms[0].type)}
           >
             <Popup>
-              <div style={{ minWidth: '200px' }}>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>
-                  {restroom.name}
+              <div style={{ minWidth: '280px', maxHeight: '400px', overflowY: 'auto' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>
+                  {locationGroup.location.name}
                 </h3>
-                <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>
-                  Type: {restroom.type}
-                </p>
                 
-                {restroom.access_codes && restroom.access_codes.length > 0 ? (
-                  <div>
-                    <h4 style={{ margin: '8px 0 4px 0', fontSize: '14px' }}>
-                      Access Codes:
-                    </h4>
-                    {(restroom.access_codes || [])
-                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                      .map((code) => (
-                        <div 
-                          key={code.id}
-                          style={{ 
-                            padding: '4px 8px',
-                            margin: '2px 0',
-                            backgroundColor: '#f5f5f5',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong>{code.code}</strong>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleVote(code.id, 'like', restroom.id);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '12px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px',
-                                  padding: '2px 4px',
-                                  borderRadius: '2px',
-                                  color: '#666'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#e8f5e8';
-                                  e.currentTarget.style.color = '#4caf50';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                  e.currentTarget.style.color = '#666';
-                                }}
-                                title="This code works"
-                              >
-                                👍 {code.likes}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleVote(code.id, 'dislike', restroom.id);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '12px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px',
-                                  padding: '2px 4px',
-                                  borderRadius: '2px',
-                                  color: '#666'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#ffeaea';
-                                  e.currentTarget.style.color = '#f44336';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                  e.currentTarget.style.color = '#666';
-                                }}
-                                title="This code doesn't work"
-                              >
-                                👎 {code.dislikes}
-                              </button>
+                {locationGroup.restrooms.map((restroom, restroomIndex) => (
+                  <div key={restroom.id} style={{ 
+                    marginBottom: restroomIndex < locationGroup.restrooms.length - 1 ? '16px' : '0', 
+                    padding: '12px', 
+                    border: '1px solid #e1e5e9', 
+                    borderRadius: '6px',
+                    backgroundColor: '#f8f9fa'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>
+                        {restroom.name}
+                      </h4>
+                      <span style={{ fontSize: '12px', color: '#666', textTransform: 'capitalize' }}>
+                        {restroom.type}
+                      </span>
+                    </div>
+                    
+                    {restroom.access_codes && restroom.access_codes.length > 0 ? (
+                      <div>
+                        <h5 style={{ margin: '8px 0 4px 0', fontSize: '12px' }}>
+                          Access Codes:
+                        </h5>
+                        {(restroom.access_codes || [])
+                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                          .map((code) => (
+                            <div 
+                              key={code.id}
+                              style={{ 
+                                padding: '4px 8px',
+                                margin: '2px 0',
+                                backgroundColor: '#fff',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                border: '1px solid #ddd'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong>{code.code}</strong>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleVote(code.id, 'like', restroom.id);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                      padding: '2px',
+                                      color: '#666'
+                                    }}
+                                    title="This code works"
+                                  >
+                                    👍 {code.likes}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleVote(code.id, 'dislike', restroom.id);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                      padding: '2px',
+                                      color: '#666'
+                                    }}
+                                    title="This code doesn't work"
+                                  >
+                                    👎 {code.dislikes}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ))
-                    }
+                          ))
+                        }
+                      </div>
+                    ) : (
+                      <p style={{ margin: '8px 0', fontSize: '11px', color: '#666' }}>
+                        No access codes available
+                      </p>
+                    )}
+                    
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                      <button
+                        onClick={() => handleEditRestroomClick(restroom)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          backgroundColor: '#ff9800',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleAddAccessCodeClick(restroom)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          backgroundColor: '#4285f4',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Add Code
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <p style={{ margin: '8px 0', fontSize: '12px', color: '#666' }}>
-                    No access codes available
-                  </p>
-                )}
+                ))}
                 
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button
-                    onClick={() => handleEditRestroomClick(restroom)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 16px',
-                      backgroundColor: '#ff9800',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Edit Name
-                  </button>
-                  <button
-                    onClick={() => handleAddAccessCodeClick(restroom)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 16px',
-                      backgroundColor: '#4285f4',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Add Code
-                  </button>
-                </div>
+                {/* Add Another Restroom button */}
+                <button
+                  onClick={() => handleAddAnotherRestroomClick(locationGroup)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    backgroundColor: '#4caf50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    marginTop: '12px'
+                  }}
+                >
+                  + Add Another Restroom Here
+                </button>
               </div>
             </Popup>
           </Marker>
@@ -639,12 +708,20 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
       </button>
 
       {/* Restroom Form Modal */}
-      {showRestroomForm && selectedSearchLocation && (
+      {showRestroomForm && (selectedSearchLocation || selectedLocationGroup) && (
         <RestroomForm
-          location={selectedSearchLocation}
+          location={selectedSearchLocation || {
+            id: `existing-${selectedLocationGroup?.location.id}`,
+            name: selectedLocationGroup?.location.name || '',
+            latitude: selectedLocationGroup?.location.latitude || 0,
+            longitude: selectedLocationGroup?.location.longitude || 0,
+            type: 'existing',
+            importance: 1
+          }}
           onSubmit={handleRestroomSubmit}
           onCancel={handleRestroomCancel}
           isSubmitting={isSubmittingRestroom}
+          isAddingToExisting={!!selectedLocationGroup}
         />
       )}
 
@@ -672,4 +749,4 @@ const Map: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, 
   );
 };
 
-export default Map;
+export default MapComponent;

@@ -47,7 +47,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
 
   // Debounced search function
   const debouncedSearch = useCallback((query: string) => {
-    searchService.debounce(performSearch, 300)(query);
+    searchService.debounce(performSearch, 500)(query);
     }, [performSearch]);
 
   // Handle input change

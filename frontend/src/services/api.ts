@@ -8,6 +8,13 @@ export interface Restroom {
   type: 'male' | 'female' | 'neutral';
   access_codes: AccessCode[];
   created_at: string;
+  location?: {
+    id: number;
+    name: string;
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
 }
 
 export interface AccessCode {
@@ -23,6 +30,7 @@ export interface CreateRestroomData {
   latitude: number;
   longitude: number;
   type: 'male' | 'female' | 'neutral';
+  locationName?: string;
 }
 
 export interface CreateCodeData {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Map from './components/Map';
+import MapComponent from './components/Map';
 import { apiService, Restroom } from './services/api';
 import './App.css';
 
@@ -109,7 +109,7 @@ function App() {
 
   return (
     <div className="App">
-      <Map 
+      <MapComponent 
         restrooms={restrooms}
         onLocationFound={handleLocationFound}
         onRestroomAdded={handleRestroomAdded}

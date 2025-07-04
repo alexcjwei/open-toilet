@@ -111,7 +111,7 @@ jest.mock('../../services/api', () => ({
   }
 }));
 
-import Map from '../Map';
+import MapComponent from '../Map';
 
 describe('Map Component', () => {
   const mockRestrooms = [
@@ -148,7 +148,7 @@ describe('Map Component', () => {
   });
 
   it('should render map container and basic elements', () => {
-    render(<Map restrooms={[]} />);
+    render(<MapComponent restrooms={[]} />);
 
     expect(screen.getByTestId('map-container')).toBeInTheDocument();
     expect(screen.getByTestId('tile-layer')).toBeInTheDocument();
@@ -157,7 +157,7 @@ describe('Map Component', () => {
   });
 
   it('should render restroom markers', () => {
-    render(<Map restrooms={mockRestrooms} />);
+    render(<MapComponent restrooms={mockRestrooms} />);
 
     const markers = screen.getAllByTestId('marker');
     expect(markers).toHaveLength(2); // Should have 2 restroom markers (no user location yet)
@@ -167,7 +167,7 @@ describe('Map Component', () => {
   });
 
   it('should display restroom information in popups', () => {
-    render(<Map restrooms={mockRestrooms} />);
+    render(<MapComponent restrooms={mockRestrooms} />);
 
     expect(screen.getByText('Test Restroom 1')).toBeInTheDocument();
     expect(screen.getByText('Test Restroom 2')).toBeInTheDocument();
@@ -176,7 +176,7 @@ describe('Map Component', () => {
   });
 
   it('should display access codes when available', () => {
-    render(<Map restrooms={mockRestrooms} />);
+    render(<MapComponent restrooms={mockRestrooms} />);
 
     expect(screen.getByText('Access Codes:')).toBeInTheDocument();
     expect(screen.getByText('1234')).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe('Map Component', () => {
   });
 
   it('should display "No access codes available" when no codes exist', () => {
-    render(<Map restrooms={mockRestrooms} />);
+    render(<MapComponent restrooms={mockRestrooms} />);
 
     expect(screen.getByText('No access codes available')).toBeInTheDocument();
   });
@@ -201,7 +201,7 @@ describe('Map Component', () => {
       });
     });
 
-    render(<Map restrooms={[]} onLocationFound={mockOnLocationFound} />);
+    render(<MapComponent restrooms={[]} onLocationFound={mockOnLocationFound} />);
 
     const locationButton = screen.getByTitle('Find my location');
     await userEvent.click(locationButton);
@@ -221,7 +221,7 @@ describe('Map Component', () => {
       });
     });
 
-    render(<Map restrooms={[]} />);
+    render(<MapComponent restrooms={[]} />);
 
     const locationButton = screen.getByTitle('Find my location');
     await userEvent.click(locationButton);
@@ -242,7 +242,7 @@ describe('Map Component', () => {
       writable: true,
     });
 
-    render(<Map restrooms={[]} />);
+    render(<MapComponent restrooms={[]} />);
 
     const locationButton = screen.getByTitle('Find my location');
     await userEvent.click(locationButton);
@@ -282,7 +282,7 @@ describe('Map Component', () => {
       created_at: '2023-01-01T00:00:00Z'
     }];
 
-    render(<Map restrooms={restroomWithMultipleCodes} />);
+    render(<MapComponent restrooms={restroomWithMultipleCodes} />);
 
     const codeElements = screen.getAllByText(/code/);
     const codeTexts = codeElements.map(el => el.textContent);
@@ -304,7 +304,7 @@ describe('Map Component', () => {
       });
     });
 
-    render(<Map restrooms={[]} onLocationFound={mockOnLocationFound} />);
+    render(<MapComponent restrooms={[]} onLocationFound={mockOnLocationFound} />);
 
     const locationButton = screen.getByTitle('Find my location');
     await userEvent.click(locationButton);
@@ -323,7 +323,7 @@ describe('Map Component', () => {
       });
     });
 
-    render(<Map restrooms={[]} />);
+    render(<MapComponent restrooms={[]} />);
 
     const locationButton = screen.getByTitle('Find my location');
     await userEvent.click(locationButton);
@@ -334,14 +334,14 @@ describe('Map Component', () => {
 
   describe('Search Functionality', () => {
     it('should render search box with correct placeholder', () => {
-      render(<Map restrooms={[]} />);
+      render(<MapComponent restrooms={[]} />);
 
       const searchInput = screen.getByTestId('search-input');
       expect(searchInput).toHaveAttribute('placeholder', 'Search for places to add restrooms...');
     });
 
     it('should handle search results and display markers', async () => {
-      render(<Map restrooms={[]} />);
+      render(<MapComponent restrooms={[]} />);
 
       const searchInput = screen.getByTestId('search-input');
       await userEvent.type(searchInput, 'starbucks');
@@ -352,7 +352,7 @@ describe('Map Component', () => {
     });
 
     it('should handle location selection from search', async () => {
-      render(<Map restrooms={[]} />);
+      render(<MapComponent restrooms={[]} />);
 
       const selectButton = screen.getByTestId('mock-select-location');
       await userEvent.click(selectButton);
@@ -363,7 +363,7 @@ describe('Map Component', () => {
     });
 
     it('should display "Add Restroom Here" button for selected location', async () => {
-      render(<Map restrooms={[]} />);
+      render(<MapComponent restrooms={[]} />);
 
       const selectButton = screen.getByTestId('mock-select-location');
       await userEvent.click(selectButton);
@@ -381,7 +381,7 @@ describe('Map Component', () => {
         importance: 0.8
       };
 
-      render(<Map restrooms={mockRestrooms} />);
+      render(<MapComponent restrooms={mockRestrooms} />);
 
       // Should have restroom markers
       const markers = screen.getAllByTestId('marker');
@@ -389,7 +389,7 @@ describe('Map Component', () => {
     });
 
     it('should clear search results when location is selected', async () => {
-      render(<Map restrooms={[]} />);
+      render(<MapComponent restrooms={[]} />);
 
       const searchInput = screen.getByTestId('search-input');
       await userEvent.type(searchInput, 'starbucks');
@@ -412,7 +412,7 @@ describe('Map Component', () => {
         flyTo: mockFlyTo,
       }));
 
-      render(<Map restrooms={[]} />);
+      render(<MapComponent restrooms={[]} />);
 
       // Select a location using the mock button
       const selectButton = screen.getByTestId('mock-select-location');

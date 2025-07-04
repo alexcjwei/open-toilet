@@ -11,13 +11,15 @@ interface RestroomFormProps {
   }) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  isAddingToExisting?: boolean;
 }
 
 const RestroomForm: React.FC<RestroomFormProps> = ({
   location,
   onSubmit,
   onCancel,
-  isSubmitting = false
+  isSubmitting = false,
+  isAddingToExisting = false
 }) => {
   const [name, setName] = useState('');
   const [type, setType] = useState<'male' | 'female' | 'neutral'>('neutral');
@@ -62,7 +64,7 @@ const RestroomForm: React.FC<RestroomFormProps> = ({
           fontWeight: '600',
           color: '#333'
         }}>
-          Add New Restroom
+          {isAddingToExisting ? 'Add Another Restroom' : 'Add New Restroom'}
         </h2>
 
         <div style={{
