@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -6,7 +6,6 @@ import SearchBox from './SearchBox';
 import RestroomForm from './RestroomForm';
 import AccessCodeForm from './AccessCodeForm';
 import EditRestroomForm from './EditRestroomForm';
-import { SearchLocation } from '../services/searchService';
 import { Restroom, AccessCode, LocationGroup } from '../types';
 import { useUserLocation, useMapController, useRestroomActions } from '../hooks';
 import { MapIcons } from '../utils/mapIcons';
