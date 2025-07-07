@@ -1,45 +1,7 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+import { Restroom, AccessCode, CreateRestroomData, CreateCodeData, VoteData } from '../types';
+import { API_CONFIG } from '../constants';
 
-export interface Restroom {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  type: 'male' | 'female' | 'neutral';
-  access_codes: AccessCode[];
-  created_at: string;
-  location?: {
-    id: number;
-    name: string;
-    latitude: number;
-    longitude: number;
-    address?: string;
-  };
-}
-
-export interface AccessCode {
-  id: number;
-  code: string;
-  likes: number;
-  dislikes: number;
-  created_at: string;
-}
-
-export interface CreateRestroomData {
-  name: string;
-  latitude: number;
-  longitude: number;
-  type: 'male' | 'female' | 'neutral';
-  locationName?: string;
-}
-
-export interface CreateCodeData {
-  code: string;
-}
-
-export interface VoteData {
-  type: 'like' | 'dislike';
-}
+const API_BASE_URL = API_CONFIG.BASE_URL;
 
 class ApiService {
   async getAllRestrooms(): Promise<Restroom[]> {

@@ -7,7 +7,9 @@ import RestroomForm from './RestroomForm';
 import AccessCodeForm from './AccessCodeForm';
 import EditRestroomForm from './EditRestroomForm';
 import { SearchLocation } from '../services/searchService';
-import { apiService } from '../services/api';
+import { Restroom, AccessCode, LocationGroup } from '../types';
+import { useUserLocation, useMapController, useRestroomActions } from '../hooks';
+import { MapIcons } from '../utils/mapIcons';
 
 // Fix for default markers in react-leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -17,30 +19,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-interface Restroom {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  type: 'male' | 'female' | 'neutral';
-  access_codes: AccessCode[];
-  created_at: string;
-  location?: {
-    id: number;
-    name: string;
-    latitude: number;
-    longitude: number;
-    address?: string;
-  };
-}
-
-interface AccessCode {
-  id: number;
-  code: string;
-  likes: number;
-  dislikes: number;
-  created_at: string;
-}
 
 interface MapProps {
   restrooms: Restroom[];
@@ -94,17 +72,8 @@ const MapController: React.FC<{
 };
 
 // Group restrooms by location
-const groupRestroomsByLocation = (restrooms: Restroom[]) => {
-  const locationMap = new Map<string, {
-    location: {
-      id?: number;
-      name: string;
-      latitude: number;
-      longitude: number;
-      address?: string;
-    };
-    restrooms: Restroom[];
-  }>();
+const groupRestroomsByLocation = (restrooms: Restroom[]): LocationGroup[] => {
+  const locationMap = new Map<string, LocationGroup>();
   
   restrooms.forEach(restroom => {
     const locationKey = `${restroom.latitude},${restroom.longitude}`;
@@ -125,286 +94,69 @@ const groupRestroomsByLocation = (restrooms: Restroom[]) => {
 };
 
 const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestroomAdded, onRestroomUpdated, onAccessCodeAdded, onAccessCodeVoted }) => {
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
-  const [shouldFlyTo, setShouldFlyTo] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
-  const [shouldSetInitialView, setShouldSetInitialView] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchLocation[]>([]);
-  const [selectedSearchLocation, setSelectedSearchLocation] = useState<SearchLocation | null>(null);
-  const [shouldFlyToSearch, setShouldFlyToSearch] = useState(false);
-  const [showRestroomForm, setShowRestroomForm] = useState(false);
-  const [isSubmittingRestroom, setIsSubmittingRestroom] = useState(false);
-  const [showAccessCodeForm, setShowAccessCodeForm] = useState(false);
-  const [selectedRestroom, setSelectedRestroom] = useState<Restroom | null>(null);
-  const [isSubmittingAccessCode, setIsSubmittingAccessCode] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [editingRestroom, setEditingRestroom] = useState<Restroom | null>(null);
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
-  const [selectedLocationGroup, setSelectedLocationGroup] = useState<any>(null);
+  // Custom hooks
+  const { userLocation, findUserLocation, hasInitialized } = useUserLocation({ onLocationFound });
+  const {
+    mapCenter,
+    shouldFlyTo,
+    setShouldFlyTo,
+    shouldSetInitialView,
+    setShouldSetInitialView,
+    searchResults,
+    selectedSearchLocation,
+    shouldFlyToSearch,
+    setShouldFlyToSearch,
+    handleSearchResults,
+    handleLocationSelect,
+    flyToLocation,
+    setInitialView
+  } = useMapController();
+  
+  const {
+    showRestroomForm,
+    isSubmittingRestroom,
+    showAccessCodeForm,
+    selectedRestroom,
+    isSubmittingAccessCode,
+    showEditForm,
+    editingRestroom,
+    isSubmittingEdit,
+    selectedLocationGroup,
+    handleAddRestroomClick,
+    handleAddAnotherRestroomClick,
+    handleRestroomSubmit,
+    handleRestroomCancel,
+    handleAddAccessCodeClick,
+    handleAccessCodeSubmit,
+    handleAccessCodeCancel,
+    handleVote,
+    handleEditRestroomClick,
+    handleEditSubmit,
+    handleEditCancel
+  } = useRestroomActions({
+    onRestroomAdded,
+    onRestroomUpdated,
+    onAccessCodeAdded,
+    onAccessCodeVoted
+  });
 
-  // Get user location on component mount
+  // Update map center when user location changes
   useEffect(() => {
-    if (!hasInitialized && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const newLocation: [number, number] = [latitude, longitude];
-          setUserLocation(newLocation);
-          setMapCenter(newLocation);
-          setShouldSetInitialView(true); // Set initial view without animation
-          onLocationFound?.(latitude, longitude);
-          setHasInitialized(true);
-        },
-        (error) => {
-          console.log('Could not get user location on startup:', error.message);
-          // Silently fall back to default location (NYC)
-          setHasInitialized(true);
-        },
-        {
-          enableHighAccuracy: false, // Use less accurate but faster location for initial load
-          timeout: 5000, // 5 second timeout
-          maximumAge: 300000 // 5 minutes
-        }
-      );
-    } else if (!hasInitialized) {
-      // No geolocation support, use default
-      setHasInitialized(true);
+    if (userLocation && hasInitialized) {
+      setInitialView(userLocation);
     }
-  }, [hasInitialized, onLocationFound]);
+  }, [userLocation, hasInitialized, setInitialView]);
 
-  const findUserLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const newLocation: [number, number] = [latitude, longitude];
-          setUserLocation(newLocation);
-          setMapCenter(newLocation);
-          setShouldFlyTo(true);
-          onLocationFound?.(latitude, longitude);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          alert('Unable to get your location. Please enable location services.');
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000 // 5 minutes
-        }
-      );
-    } else {
-      alert('Geolocation is not supported by this browser.');
+  // Handle user location button click
+  const handleFindUserLocation = () => {
+    findUserLocation();
+    if (userLocation) {
+      flyToLocation(userLocation);
     }
   };
 
-  const createCustomIcon = (type: string) => {
-    const iconColors = {
-      male: '#4285f4',
-      female: '#ea4335',
-      neutral: '#34a853',
-      multi: '#9c27b0' // Purple for multiple restrooms
-    };
 
-    const isMulti = type === 'multi';
 
-    return L.divIcon({
-      className: 'custom-marker',
-      html: `
-        <div style="
-          background-color: ${iconColors[type as keyof typeof iconColors] || iconColors.neutral};
-          width: ${isMulti ? '24px' : '20px'};
-          height: ${isMulti ? '24px' : '20px'};
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 12px;
-          font-weight: bold;
-          color: white;
-        ">
-          ${isMulti ? '🏢' : ''}
-        </div>
-      `,
-      iconSize: [isMulti ? 24 : 20, isMulti ? 24 : 20],
-      iconAnchor: [isMulti ? 12 : 10, isMulti ? 12 : 10]
-    });
-  };
-
-  const userIcon = L.divIcon({
-    className: 'user-marker',
-    html: `
-      <div style="
-        background-color: #ff6b6b;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-      "></div>
-    `,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6]
-  });
-
-  const searchResultIcon = L.divIcon({
-    className: 'search-result-marker',
-    html: `
-      <div style="
-        background-color: #9c27b0;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      "></div>
-    `,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8]
-  });
-
-  const selectedSearchIcon = L.divIcon({
-    className: 'selected-search-marker',
-    html: `
-      <div style="
-        background-color: #ff9800;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-      "></div>
-    `,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-  });
-
-  // Handle search results
-  const handleSearchResults = (results: SearchLocation[]) => {
-    setSearchResults(results);
-    setSelectedSearchLocation(null);
-  };
-
-  // Handle location selection from search
-  const handleLocationSelect = (location: SearchLocation) => {
-    setSelectedSearchLocation(location);
-    setSearchResults([]); // Clear other search results
-    setShouldFlyToSearch(true);
-  };
-
-  // Handle opening restroom form
-  const handleAddRestroomClick = () => {
-    setShowRestroomForm(true);
-  };
-
-  // Handle adding another restroom to existing location
-  const handleAddAnotherRestroomClick = (locationGroup: any) => {
-    setSelectedLocationGroup(locationGroup);
-    setShowRestroomForm(true);
-  };
-
-  // Handle restroom form submission
-  const handleRestroomSubmit = async (restroomData: {
-    name: string;
-    type: 'male' | 'female' | 'neutral';
-    latitude: number;
-    longitude: number;
-  }) => {
-    try {
-      setIsSubmittingRestroom(true);
-      const newRestroom = await apiService.createRestroom(restroomData);
-      onRestroomAdded?.(newRestroom);
-      setShowRestroomForm(false);
-      setSelectedSearchLocation(null); // Clear selected location
-    } catch (error) {
-      console.error('Failed to create restroom:', error);
-      alert('Failed to create restroom. Please try again.');
-    } finally {
-      setIsSubmittingRestroom(false);
-    }
-  };
-
-  // Handle form cancellation
-  const handleRestroomCancel = () => {
-    setShowRestroomForm(false);
-    setSelectedLocationGroup(null); // Clear selected location group
-  };
-
-  // Handle opening access code form
-  const handleAddAccessCodeClick = (restroom: Restroom) => {
-    setSelectedRestroom(restroom);
-    setShowAccessCodeForm(true);
-  };
-
-  // Handle access code form submission
-  const handleAccessCodeSubmit = async (accessCodeData: {
-    restroom_id: number;
-    code: string;
-  }) => {
-    try {
-      setIsSubmittingAccessCode(true);
-      const newAccessCode = await apiService.addAccessCode(accessCodeData.restroom_id, { code: accessCodeData.code });
-      onAccessCodeAdded?.(accessCodeData.restroom_id, newAccessCode);
-      setShowAccessCodeForm(false);
-      setSelectedRestroom(null);
-    } catch (error) {
-      console.error('Failed to create access code:', error);
-      alert('Failed to add access code. Please try again.');
-    } finally {
-      setIsSubmittingAccessCode(false);
-    }
-  };
-
-  // Handle access code form cancellation
-  const handleAccessCodeCancel = () => {
-    setShowAccessCodeForm(false);
-    setSelectedRestroom(null);
-  };
-
-  // Handle voting on access codes
-  const handleVote = async (codeId: number, voteType: 'like' | 'dislike', restroomId: number) => {
-    try {
-      await apiService.voteOnCode(codeId, { type: voteType });
-      onAccessCodeVoted?.(restroomId, codeId, voteType);
-    } catch (error) {
-      console.error('Failed to vote:', error);
-      alert('Failed to vote. Please try again.');
-    }
-  };
-
-  // Handle opening edit form
-  const handleEditRestroomClick = (restroom: Restroom) => {
-    setEditingRestroom(restroom);
-    setShowEditForm(true);
-  };
-
-  // Handle edit form submission
-  const handleEditSubmit = async (restroomId: number, data: { name: string }) => {
-    try {
-      setIsSubmittingEdit(true);
-      const updatedRestroom = await apiService.updateRestroom(restroomId, data);
-      onRestroomUpdated?.(updatedRestroom);
-      setShowEditForm(false);
-      setEditingRestroom(null);
-      
-      // Force popup refresh by closing and reopening if needed
-      // The restrooms prop will be updated by the parent component
-    } catch (error) {
-      console.error('Failed to update restroom:', error);
-      alert('Failed to update restroom. Please try again.');
-    } finally {
-      setIsSubmittingEdit(false);
-    }
-  };
-
-  // Handle edit form cancellation
-  const handleEditCancel = () => {
-    setShowEditForm(false);
-    setEditingRestroom(null);
-  };
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
@@ -432,7 +184,7 @@ const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestro
         
         {/* User location marker */}
         {userLocation && (
-          <Marker position={userLocation} icon={userIcon}>
+          <Marker position={userLocation} icon={MapIcons.createUserIcon()}>
             <Popup>Your location</Popup>
           </Marker>
         )}
@@ -442,7 +194,7 @@ const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestro
           <Marker
             key={result.id}
             position={[result.latitude, result.longitude]}
-            icon={searchResultIcon}
+            icon={MapIcons.createSearchResultIcon()}
             eventHandlers={{
               click: () => handleLocationSelect(result)
             }}
@@ -479,7 +231,7 @@ const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestro
         {selectedSearchLocation && (
           <Marker
             position={[selectedSearchLocation.latitude, selectedSearchLocation.longitude]}
-            icon={selectedSearchIcon}
+            icon={MapIcons.createSelectedSearchIcon()}
           >
             <Popup>
               <div style={{ minWidth: '200px' }}>
@@ -518,7 +270,7 @@ const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestro
           <Marker
             key={`location-${index}`}
             position={[locationGroup.location.latitude, locationGroup.location.longitude]}
-            icon={createCustomIcon(locationGroup.restrooms.length > 1 ? 'multi' : locationGroup.restrooms[0].type)}
+            icon={MapIcons.createCustomIcon(locationGroup.restrooms.length > 1 ? 'multi' : locationGroup.restrooms[0].type)}
           >
             <Popup>
               <div style={{ minWidth: '280px', maxHeight: '400px', overflowY: 'auto' }}>
@@ -688,7 +440,7 @@ const MapComponent: React.FC<MapProps> = ({ restrooms, onLocationFound, onRestro
       
       {/* Location button */}
       <button
-        onClick={findUserLocation}
+        onClick={handleFindUserLocation}
         style={{
           position: 'absolute',
           top: '20px',

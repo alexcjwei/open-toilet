@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { searchService, SearchLocation } from '../services/searchService';
+import { TIMEOUTS } from '../constants';
 
 interface SearchBoxProps {
   onLocationSelect: (location: SearchLocation) => void;
@@ -47,7 +48,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
 
   // Debounced search function
   const debouncedSearch = useCallback((query: string) => {
-    searchService.debounce(performSearch, 500)(query);
+    searchService.debounce(performSearch, TIMEOUTS.SEARCH_DEBOUNCE)(query);
     }, [performSearch]);
 
   // Handle input change

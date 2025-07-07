@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { SearchLocation } from '../services/searchService';
+import { Modal, Button } from './common';
+import { COLORS, SIZES } from '../constants';
 
 interface RestroomFormProps {
   location: SearchLocation;
@@ -37,111 +39,87 @@ const RestroomForm: React.FC<RestroomFormProps> = ({
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 2000,
-      padding: '20px'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        width: '100%',
-        maxWidth: '400px',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-      }}>
-        <h2 style={{
-          margin: '0 0 16px 0',
-          fontSize: '20px',
-          fontWeight: '600',
-          color: '#333'
-        }}>
-          {isAddingToExisting ? 'Add Another Restroom' : 'Add New Restroom'}
-        </h2>
+    <Modal
+      isOpen={true}
+      onClose={onCancel}
+      title={isAddingToExisting ? 'Add Another Restroom' : 'Add New Restroom'}
+    >
 
-        <div style={{
-          padding: '12px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          border: '1px solid #e9ecef'
+      <div style={{
+        padding: '12px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: SIZES.BORDER_RADIUS.LARGE,
+        marginBottom: '20px',
+        border: `1px solid ${COLORS.BORDERS.DEFAULT}`
+      }}>
+        <h3 style={{
+          margin: '0 0 4px 0',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: COLORS.TEXT.SECONDARY
         }}>
-          <h3 style={{
-            margin: '0 0 4px 0',
+          Location
+        </h3>
+        <p style={{
+          margin: 0,
+          fontSize: '14px',
+          color: COLORS.TEXT.PRIMARY
+        }}>
+          {location.name}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '6px',
             fontSize: '14px',
             fontWeight: '500',
-            color: '#666'
+            color: COLORS.TEXT.PRIMARY
           }}>
-            Location
-          </h3>
-          <p style={{
-            margin: 0,
-            fontSize: '14px',
-            color: '#333'
-          }}>
-            {location.name}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '6px',
+            Restroom Name *
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Main Floor Restroom, Ground Level..."
+            style={{
+              width: '100%',
+              padding: '12px',
               fontSize: '14px',
-              fontWeight: '500',
-              color: '#333'
-            }}>
-              Restroom Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Main Floor Restroom, Ground Level..."
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '14px',
-                border: '2px solid #e1e5e9',
-                borderRadius: '6px',
-                outline: 'none',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4285f4';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e1e5e9';
-              }}
-              required
-            />
+              border: `2px solid ${COLORS.BORDERS.DEFAULT}`,
+              borderRadius: SIZES.BORDER_RADIUS.MEDIUM,
+              outline: 'none',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.2s'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = COLORS.BORDERS.FOCUS;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = COLORS.BORDERS.DEFAULT;
+            }}
+            required
+          />
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#333'
-            }}>
-              Restroom Type *
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[
-                { value: 'male', label: 'Male', color: '#4285f4' },
-                { value: 'female', label: 'Female', color: '#ea4335' },
-                { value: 'neutral', label: 'Neutral/All', color: '#34a853' }
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: COLORS.TEXT.PRIMARY
+          }}>
+            Restroom Type *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { value: 'male', label: 'Male', color: COLORS.RESTROOM_TYPES.male },
+              { value: 'female', label: 'Female', color: COLORS.RESTROOM_TYPES.female },
+              { value: 'neutral', label: 'Neutral/All', color: COLORS.RESTROOM_TYPES.neutral }
               ].map((option) => (
                 <label
                   key={option.value}
@@ -151,12 +129,12 @@ const RestroomForm: React.FC<RestroomFormProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     padding: '12px 8px',
-                    border: `2px solid ${type === option.value ? option.color : '#e1e5e9'}`,
-                    borderRadius: '6px',
+                    border: `2px solid ${type === option.value ? option.color : COLORS.BORDERS.DEFAULT}`,
+                    borderRadius: SIZES.BORDER_RADIUS.MEDIUM,
                     cursor: 'pointer',
                     fontSize: '14px',
                     fontWeight: '500',
-                    color: type === option.value ? option.color : '#666',
+                    color: type === option.value ? option.color : COLORS.TEXT.SECONDARY,
                     backgroundColor: type === option.value ? `${option.color}10` : 'white',
                     transition: 'all 0.2s'
                   }}
@@ -175,69 +153,29 @@ const RestroomForm: React.FC<RestroomFormProps> = ({
             </div>
           </div>
 
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-end'
-          }}>
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isSubmitting}
-              style={{
-                padding: '12px 20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                border: '2px solid #e1e5e9',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                color: '#666',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.6 : 1,
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isSubmitting) {
-                  e.currentTarget.style.backgroundColor = '#f8f9fa';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim() || isSubmitting}
-              style={{
-                padding: '12px 20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: !name.trim() || isSubmitting ? '#ccc' : '#4caf50',
-                color: 'white',
-                cursor: !name.trim() || isSubmitting ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (name.trim() && !isSubmitting) {
-                  e.currentTarget.style.backgroundColor = '#45a049';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (name.trim() && !isSubmitting) {
-                  e.currentTarget.style.backgroundColor = '#4caf50';
-                }
-              }}
-            >
-              {isSubmitting ? 'Adding...' : 'Add Restroom'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'flex-end'
+        }}>
+          <Button
+            variant="secondary"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!name.trim()}
+            isLoading={isSubmitting}
+          >
+            Add Restroom
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MapComponent from './components/Map';
-import { apiService, Restroom } from './services/api';
+import { apiService } from './services/api';
+import { Restroom } from './types';
 import './App.css';
 
 function App() {
